@@ -8,13 +8,7 @@ from datetime import datetime
 import json
 
 
-def produce_html(content: list, domain_name: str) -> str:
-    now = datetime.now()
-
-    # dd/mm/YY H:M:S
-    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-    print("date and time =", dt_string)
-
+def produce_html(content: list) -> str:
     html = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -92,19 +86,23 @@ def produce_html(content: list, domain_name: str) -> str:
     <header>
         <img src="logo.png" alt="Logo" class="logo">
     </header>
-    <nav>"""
-
-    html += f"""
+    <nav>
         <a href="index.html">Home</a>
         <a href="sport.html">Sport</a>
         <a href="business.html">Business</a>
     </nav>
-    <section>
+   <section>"""
+
+    # Add a timestamp to the page footer.
+    now = datetime.now()
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    print("date and time =", dt_string)
+    html += f"""
     <footer>
         Last refresh: {dt_string}
     </footer>
 """
-
+    # Add the actual stories to the page.
     for headline, story in content:
         html += f"""        <div class="article">
             <h2>{headline}</h2>
@@ -112,6 +110,7 @@ def produce_html(content: list, domain_name: str) -> str:
         </div>
 """
 
+    # Close remaining tags.
     html += """    </section>
 </body>
 </html>"""
@@ -121,14 +120,13 @@ def produce_html(content: list, domain_name: str) -> str:
 def produce_content(rss_url: str,
                     humour_style: str,
                     num_stories: int) -> list:
-
-    client = OpenAI(
-        # This is the default and can be omitted.
-        api_key=os.environ.get("OPENAI_API_KEY"),
-    )
+    """Produce a list of content for a 1 page of the website.
+    Each item in the returned list is a tuple (story headline, funny version of the story)."""
 
     response = get(rss_url)
     rss = RSSParser.parse(response.text)
+
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
     # Iteratively over feed items.
     content = []
@@ -179,20 +177,22 @@ def produce_content(rss_url: str,
 def write_to_s3(bucket: str, object_key: str, data: str) -> None:
     """For parm bucket name, object key and data string, write the object to S3 containing the data."""
     s3_resource = boto3.resource("s3")
-    s3_resource.Object(bucket, object_key).put(Body=bytes(data, "utf-8"), ContentType='text/html')
+    s3_resource.Object(bucket, object_key).put(Body=bytes(data, "utf-8"),ContentType='text/html')
 
 
-def cloudfront_refresh():
+def cloudfront_refresh(distribution_id: str):
+    """Create an invalidation for the parm CloudFront distribution_id. This has the effect of allowing users
+    to see a refreshed version of the website."""
     cf_client = boto3.client('cloudfront')
-    now = str(datetime.now())
+    now = str(datetime.now())                   # Using timestamp is a way of producing a unique CallerReference.
 
-    response = cf_client.create_invalidation(
-        DistributionId=os.environ.get('DISTRIBUTION_ID'),
+    cf_client.create_invalidation(
+        DistributionId=distribution_id,
         InvalidationBatch={
             'Paths': {
                 'Quantity': 1,
                 'Items': [
-                    '/*',
+                    '/*',                       # Wildcard, to invalidate the whole website.
                 ]
             },
             'CallerReference': now
@@ -201,6 +201,8 @@ def cloudfront_refresh():
 
 
 def obtain_pages_list(filename: str) -> list:
+    """Read file with parm filename. The contents of the file is JSON list, where each item in the list
+    is a dictionary. Return the list of dictionaries."""
     with open(filename, 'r') as file:
         return json.loads(file.read())
 
@@ -211,7 +213,7 @@ def main():
         print(each_page['page'])
         produce_content(rss_url=each_page['rss_url'],
                         humour_style=each_page['humour_style'],
-                        num_stories=1)
+                        num_stories=1)  # 1 story only when testing locally, to save GPT API costs.
 
 
 def lambda_handler(event, context):
@@ -222,10 +224,10 @@ def lambda_handler(event, context):
                                   humour_style=each_page['humour_style'],
                                   num_stories=8)
 
-        html = produce_html(content=content, domain_name=os.environ.get('DOMAIN_NAME'))
+        html = produce_html(content)
         print(html)
         write_to_s3(bucket=os.environ.get('BUCKET'), object_key=each_page['page'], data=html)
-    cloudfront_refresh()
+    cloudfront_refresh(distribution_id=os.environ.get('DISTRIBUTION_ID'))
 
 
 if __name__ == "__main__":
