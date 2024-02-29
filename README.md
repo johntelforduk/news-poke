@@ -11,17 +11,18 @@ pip install python-dotenv
 pip install openai
 pip install boto3
 ```
+Or do `pip install -r requirements.txt`
 ### Configuration
 Please set the following environment variables. For example, by creating a `.env` file.
 
-| Environment Variable | Description                                                                  |
-| --- |------------------------------------------------------------------------------|
-| OPENAI_API_KEY | Your OpenAI API key                                                          |
-| TEMPERATURE | 'Temperature' of Gen AI model's response. Between 0.0 and 1.0                |
+| Environment Variable | Description                                                             |
+| --- |-------------------------------------------------------------------------|
+| OPENAI_API_KEY | Your OpenAI API key                                                     |
+| TEMPERATURE | 'Temperature' of Gen AI model's response. Between 0.0 and 1.0           |
 | RSS_URL | The URL of your choice of RSS feed for the program to base funny stories on. |
 | HUMOUR_STYLE | Will be included in the prompt sent to Gen AI model. For example "Barry Cryer" |
 | DISTRIBUTION_ID | Id of your Amazon Cloudfrount distribution. |
-| BUCKET | Name of the Amazon S3 bucket that to use for website hosting. |
+| BUCKET | Name of the Amazon S3 bucket to use for website hosting. |
 
 ### Overview
 The main Lambda does the following when run in an AWS Lambda function.

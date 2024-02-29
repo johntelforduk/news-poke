@@ -1,5 +1,8 @@
-from rss_parser import RSSParser
-from requests import get  # noqa
+# News Poke AWS Lambda.
+
+# from rss_parser import RSSParser
+# from requests import get  # noqa
+import feedparser
 from dotenv import load_dotenv
 from openai import OpenAI
 import os
@@ -8,24 +11,92 @@ from datetime import datetime
 import json
 
 
+def obtain_stories(rss_url: str) -> list:
+    rss = feedparser.parse(rss_url)
+    items = rss.entries
+
+    # Iterate over feed items.
+    stories = []
+    while len(items) > 0:
+        item = items.pop(0)
+        headline = item.title
+        thumbnail = item.media_thumbnail[0]['url']
+        story = item.description
+
+        stories.append((headline, thumbnail, story))
+
+    return stories
+
+
+def generate_content(stories: list,
+                     humour_style: str,
+                     num_stories: int) -> list:
+    """Produce a list of content for a 1 page of the website.
+    Each item in the returned list is a tuple (story headline, thumbnail URL, funny version of the story)."""
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    content = []
+
+    # Iterate over stories.
+    while len(content) < num_stories and len(stories) > 0:
+        headline, thumbnail, story = stories.pop(0)
+        prompt = f"""Your task is to impersonate {humour_style}.
+I will now give you a real news headline inside the XML tag 'headline' and one sentence from the story inside the XML tag 'story'.
+<headline>
+{headline}
+</headline>
+<story>
+{story}
+</story>
+Your should respond with a new version of the story, that is in the style of {humour_style}.
+Do not include any XML tags in your response.
+Do not put your headline in quotation marks.
+Do not include any newline characters in your response.
+Up to 3 sentences would be the ideal length.
+If you believe that the subject of the story is a serious one and that it would be tasteless to make fun of it, just respond with 'No comment'."""
+
+        completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model="gpt-4-0613",
+            temperature=float(os.environ.get('TEMPERATURE'))
+        )
+
+        funny = completion.choices[0].message.content
+
+        print(f'Original Headline: {headline}')
+        print(f'Original Story: {story}')
+        print(f'Funny version: {funny}')
+        print('---')
+
+        if 'No comment' not in funny:
+            content.append((headline, thumbnail, funny))
+    return content
+
+
 def produce_html(content: list) -> str:
     html = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto">
     <title>The Daily Burp</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: Roboto, Arial, sans-serif;
             margin: 0;
             padding: 0;
             background-color: #f3f3f3;
+            min-width: 300px;
         }
         header {
-            background-color: #fe1a30;
+            background-color: #f7f7f7;
             color: #ffffff;
-            padding: 40px 10px; /* Increased vertical padding */
+            padding: 10px 10px; /* Increased vertical padding */
             text-align: center;
             display: flex;
             align-items: center;
@@ -43,7 +114,7 @@ def produce_html(content: list) -> str:
             margin: 0 10px;
         }
         section {
-            padding: 20px;
+            padding: 20px 10px;
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
@@ -51,24 +122,38 @@ def produce_html(content: list) -> str:
         .article {
             background-color: #ffffff;
             border: 1px solid #e6e6e6;
+            border-radius: 5px;
             margin: 10px;
             padding: 20px;
-            width: 30%;
+            box-shadow: 0px 3px 15px rgba(0,0,0,0.3);
             max-width: 300px;
+        }
+        .article:last-of-type {
+            margin-bottom: 40px;
+        }
+        .article p {
+            color: #777;
+            font-size: 1rem;
+            line-height: 1.2rem;
+        }
+        .article p:first-of-type {
+            font-style: italic;
+        }
+        .article p:last-of-type {
+            margin-bottom: 0;
         }
         .article h2 {
             margin-top: 0;
-            font-size: 18px;
-            color: #1e1e1e;
-        }
-        .article p {
-            color: #4d4d4d;
-            font-size: 14px;
+            margin-bottom: 22px;
+            font-size: 1.25rem;
+            line-height: 1.4rem;
+            color: #333;
+            text-align: center;
         }
         .logo {
-            max-width: 300px; /* Adjust as needed */
+            max-width: 200px;
             height: auto;
-            background-color: #fe1a30; /* Background color of the logo */
+            background-color: royalblue;
         }
         footer {
             background-color: #1e1e1e;
@@ -91,7 +176,8 @@ def produce_html(content: list) -> str:
         <a href="sport.html">Sport</a>
         <a href="business.html">Business</a>
     </nav>
-   <section>"""
+    <section>
+"""
 
     # Add a timestamp to the page footer.
     now = datetime.now()
@@ -103,75 +189,35 @@ def produce_html(content: list) -> str:
     </footer>
 """
     # Add the actual stories to the page.
-    for headline, story in content:
+    for headline, thumbnail, story in content:
         html += f"""        <div class="article">
             <h2>{headline}</h2>
+            <img src="{thumbnail}">
             <p>{story}</p>
         </div>
 """
-
     # Close remaining tags.
     html += """    </section>
+    <script>
+
+const articles = document.querySelectorAll('.article');
+
+articles.forEach(article => {
+    const prose = article.querySelector('p');
+    const parts = prose.textContent.match(/[^\.!\?]+[\.!\?]+/g);
+
+    article.removeChild(prose);
+    parts.forEach(part => {
+        const alt = document.createElement('p');
+        alt.textContent = part.trim();
+        article.appendChild(alt);
+    });
+});
+    </script>
 </body>
 </html>"""
+
     return html
-
-
-def produce_content(rss_url: str,
-                    humour_style: str,
-                    num_stories: int) -> list:
-    """Produce a list of content for a 1 page of the website.
-    Each item in the returned list is a tuple (story headline, funny version of the story)."""
-
-    response = get(rss_url)
-    rss = RSSParser.parse(response.text)
-
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-    # Iteratively over feed items.
-    content = []
-    items = rss.channel.items
-    while len(content) < num_stories and len(items) > 0:
-        item = items.pop(0)
-        headline = item.title.content
-        story = item.description.content
-
-        prompt = f"""Your task is to impersonate {humour_style}.
-    I will now give you a real news headline inside the XML tag 'headline' and one sentence from the story inside the XML tag 'story'.
-    <headline>
-    {headline}
-    </headline>
-    <story>
-    {story}
-    </story>
-    Your should respond with a new version of the story, that is in the style of {humour_style}.
-    Do not include any XML tags in your response.
-    Do not put your headline in quotation marks.
-    Do not include any newline characters in your response.
-    Up to 3 sentences would be the ideal length.
-    If you believe that the subject of the story is a serious one and that it would be tasteless to make fun of it, just respond with 'No comment'."""
-
-        completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
-            model="gpt-4-0613",
-            temperature=float(os.environ.get('TEMPERATURE'))
-        )
-
-        funny = completion.choices[0].message.content
-
-        print(f'Original Headline: {headline}')
-        print(f'Original Story: {story}')
-        print(f'Funny version: {funny}')
-        print('---')
-
-        if 'No comment' not in funny:
-            content.append((headline, funny))
-    return content
 
 
 def write_to_s3(bucket: str, object_key: str, data: str) -> None:
@@ -210,23 +256,43 @@ def obtain_pages_list(filename: str) -> list:
 def main():
     load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
     for each_page in obtain_pages_list('pages.json'):
+        stories = obtain_stories(rss_url=each_page['rss_url'])
         print(each_page['page'])
-        produce_content(rss_url=each_page['rss_url'],
-                        humour_style=each_page['humour_style'],
-                        num_stories=1)  # 1 story only when testing locally, to save GPT API costs.
+        print(stories)
+        content = generate_content(stories=stories,
+                                   humour_style=each_page['humour_style'],
+                                   num_stories=1)  # 1 story only when testing locally, to save GPT API costs.
+        html = produce_html(content=content)
+        print(html)
 
 
 def lambda_handler(event, context):
+    # load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
+    # for each_page in obtain_pages_list('pages.json'):
+    #     stories = obtain_stories(rss_url=each_page['rss_url'])
+    #
+    #     print(each_page['page'])
+    #     content = generate_content(rss_url=each_page['rss_url'],
+    #                                humour_style=each_page['humour_style'],
+    #                                num_stories=int(os.environ.get('NUM_STORIES')))
+    #
+    #     html = produce_html(content)
+    #     print(html)
+
     load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
     for each_page in obtain_pages_list('pages.json'):
+        stories = obtain_stories(rss_url=each_page['rss_url'])
         print(each_page['page'])
-        content = produce_content(rss_url=each_page['rss_url'],
-                                  humour_style=each_page['humour_style'],
-                                  num_stories=8)
-
-        html = produce_html(content)
+        print(stories)
+        content = generate_content(stories=stories,
+                                   humour_style=each_page['humour_style'],
+                                   num_stories=int(os.environ.get('NUM_STORIES')))
+        html = produce_html(content=content)
         print(html)
-        write_to_s3(bucket=os.environ.get('BUCKET'), object_key=each_page['page'], data=html)
+
+        write_to_s3(bucket=os.environ.get('BUCKET'),
+                    object_key=each_page['page'],
+                    data=html)
     cloudfront_refresh(distribution_id=os.environ.get('DISTRIBUTION_ID'))
 
 
