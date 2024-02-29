@@ -5,9 +5,10 @@ from openai import OpenAI
 import os
 import boto3
 from datetime import datetime
+import json
 
 
-def produce_html(content: list) -> str:
+def produce_html(content: list, domain_name: str) -> str:
     now = datetime.now()
 
     # dd/mm/YY H:M:S
@@ -91,16 +92,16 @@ def produce_html(content: list) -> str:
     <header>
         <img src="logo.png" alt="Logo" class="logo">
     </header>
-    <nav>
-        <a href="#">Home</a>
-        <a href="#">Politics</a>
-        <a href="#">Entertainment</a>
-        <a href="#">Sports</a>
-        <a href="#">Business</a>
+    <nav>"""
+
+    html += f"""
+        <a href="index.html">Home</a>
+        <a href="sport.html">Sport</a>
+        <a href="business.html">Business</a>
     </nav>
     <section>
     <footer>
-        Last refresh: """ + dt_string + """
+        Last refresh: {dt_string}
     </footer>
 """
 
@@ -117,30 +118,27 @@ def produce_html(content: list) -> str:
     return html
 
 
-def produce_content() -> list:
-    load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
+def produce_content(rss_url: str,
+                    humour_style: str,
+                    num_stories: int) -> list:
 
     client = OpenAI(
         # This is the default and can be omitted.
         api_key=os.environ.get("OPENAI_API_KEY"),
     )
 
-    humour_style = os.environ.get("HUMOUR_STYLE")
-
-    rss_url = os.environ.get("RSS_URL")
     response = get(rss_url)
-
     rss = RSSParser.parse(response.text)
 
     # Iteratively over feed items.
     content = []
     items = rss.channel.items
-    while len(content) < 8 and len(items) > 0:
+    while len(content) < num_stories and len(items) > 0:
         item = items.pop(0)
         headline = item.title.content
         story = item.description.content
 
-        prompt = f"""You are a very funny satirist. You have a similar style to {humour_style}.
+        prompt = f"""Your task is to impersonate {humour_style}.
     I will now give you a real news headline inside the XML tag 'headline' and one sentence from the story inside the XML tag 'story'.
     <headline>
     {headline}
@@ -148,7 +146,7 @@ def produce_content() -> list:
     <story>
     {story}
     </story>
-    Your should respond with a funny version of the story, that is in the style of {humour_style}.
+    Your should respond with a new version of the story, that is in the style of {humour_style}.
     Do not include any XML tags in your response.
     Do not put your headline in quotation marks.
     Do not include any newline characters in your response.
@@ -202,17 +200,31 @@ def cloudfront_refresh():
     )
 
 
+def obtain_pages_list(filename: str) -> list:
+    with open(filename, 'r') as file:
+        return json.loads(file.read())
+
+
 def main():
-    content = produce_content()
-    html = produce_html(content)
-    print(html)
+    load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
+    for each_page in obtain_pages_list('pages.json'):
+        print(each_page['page'])
+        produce_content(rss_url=each_page['rss_url'],
+                        humour_style=each_page['humour_style'],
+                        num_stories=1)
 
 
 def lambda_handler(event, context):
-    content = produce_content()
-    html = produce_html(content)
-    print(html)
-    write_to_s3(bucket=os.environ.get('BUCKET'), object_key='index.html', data=html)
+    load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
+    for each_page in obtain_pages_list('pages.json'):
+        print(each_page['page'])
+        content = produce_content(rss_url=each_page['rss_url'],
+                                  humour_style=each_page['humour_style'],
+                                  num_stories=8)
+
+        html = produce_html(content=content, domain_name=os.environ.get('DOMAIN_NAME'))
+        print(html)
+        write_to_s3(bucket=os.environ.get('BUCKET'), object_key=each_page['page'], data=html)
     cloudfront_refresh()
 
 
