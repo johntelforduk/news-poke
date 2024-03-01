@@ -30,6 +30,7 @@ def obtain_stories(rss_url: str) -> list:
 
 def generate_content(stories: list,
                      humour_style: str,
+                     example: str,
                      num_stories: int) -> list:
     """Produce a list of content for a 1 page of the website.
     Each item in the returned list is a tuple (story headline, thumbnail URL, funny version of the story)."""
@@ -39,7 +40,16 @@ def generate_content(stories: list,
     # Iterate over stories.
     while len(content) < num_stories and len(stories) > 0:
         headline, thumbnail, story = stories.pop(0)
-        prompt = f"""Your task is to impersonate {humour_style}.
+        prompt = f"""Your task is to impersonate {humour_style}."""
+
+        if example is not None:
+            prompt += f"""
+Here is an example of their way of talking, inside the XML tag 'example'.
+<example>
+{example}
+</example>"""
+
+        prompt += f"""
 I will now give you a real news headline inside the XML tag 'headline' and one sentence from the story inside the XML tag 'story'.
 <headline>
 {headline}
@@ -47,12 +57,14 @@ I will now give you a real news headline inside the XML tag 'headline' and one s
 <story>
 {story}
 </story>
+
 Your should respond with a new version of the story, that is in the style of {humour_style}.
 Do not include any XML tags in your response.
-Do not put your headline in quotation marks.
 Do not include any newline characters in your response.
 Up to 3 sentences would be the ideal length.
-If you believe that the subject of the story is a serious one and that it would be tasteless to make fun of it, just respond with 'No comment'."""
+You should think about whether the story I give you is a serious subject that is likely to upset a sensitive person if you make fun of it. For example, war, illness, death, rape, and sexual assault are all serious subjects. If you believe that the subject of the story is a serious one and that it would be tasteless to make fun of it, just respond with 'No comment'."""
+
+        # print(prompt)
 
         completion = client.chat.completions.create(
             messages=[
@@ -261,9 +273,10 @@ def main():
         print(stories)
         content = generate_content(stories=stories,
                                    humour_style=each_page['humour_style'],
+                                   example=each_page['example'],
                                    num_stories=1)  # 1 story only when testing locally, to save GPT API costs.
         html = produce_html(content=content)
-        print(html)
+        # print(html)
 
 
 def lambda_handler(event, context):
@@ -286,6 +299,7 @@ def lambda_handler(event, context):
         print(stories)
         content = generate_content(stories=stories,
                                    humour_style=each_page['humour_style'],
+                                   example=each_page['example'],
                                    num_stories=int(os.environ.get('NUM_STORIES')))
         html = produce_html(content=content)
         print(html)
