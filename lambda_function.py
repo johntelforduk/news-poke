@@ -22,8 +22,9 @@ def obtain_stories(rss_url: str) -> list:
         headline = item.title
         thumbnail = item.media_thumbnail[0]['url']
         story = item.description
+        origin = item.links[0].href
 
-        stories.append((headline, thumbnail, story))
+        stories.append((headline, thumbnail, story, origin))
 
     return stories
 
@@ -39,7 +40,7 @@ def generate_content(stories: list,
 
     # Iterate over stories.
     while len(content) < num_stories and len(stories) > 0:
-        headline, thumbnail, story = stories.pop(0)
+        headline, thumbnail, story, origin = stories.pop(0)
         prompt = f"""Your task is to impersonate {humour_style}."""
 
         if example is not None:
@@ -85,12 +86,13 @@ You should think about whether the story I give you is a serious subject that is
         print('---')
 
         if 'No comment' not in funny:
-            content.append((headline, thumbnail, funny))
+            content.append((headline, thumbnail, funny, origin))
     return content
 
 
 def produce_html(content: list) -> str:
-    html = """<!DOCTYPE html>
+    html = """
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -120,7 +122,8 @@ def produce_html(content: list) -> str:
             padding: 10px;
             text-align: center;
         }
-        nav a {
+        nav a,
+        footer a {
             color: #ffffff;
             text-decoration: none;
             margin: 0 10px;
@@ -132,40 +135,73 @@ def produce_html(content: list) -> str:
             justify-content: center;
         }
         .article {
-            background-color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: #ffffff !important;
             border: 1px solid #e6e6e6;
-            border-radius: 5px;
+            border-radius: 10px;
             margin: 10px;
             padding: 20px;
             box-shadow: 0px 3px 15px rgba(0,0,0,0.3);
             max-width: 300px;
         }
-        .article:last-of-type {
-            margin-bottom: 40px;
+        .article .content {
+            flex: 1;
         }
-        .article p {
-            color: #777;
-            font-size: 1rem;
-            line-height: 1.2rem;
-        }
-        .article p:first-of-type {
-            font-style: italic;
-        }
-        .article p:last-of-type {
+        .article .source {
             margin-bottom: 0;
         }
-        .article h2 {
+        .article .source a,
+        .article .source a:visited,
+        .article .source a:active,
+        .article .source a:hover {
+            text-decoration: none;
+            color: #999;
+            font-size: 0.9rem;
+            padding: 5px 8px;
+            margin-bottom: 0;
+            border: 1px solid #aaa;
+            border-radius: 8px;
+            float: right;
+        }
+        .article .content p {
+            color: #777;
+            font-size: 1rem;
+            line-height: 1.25rem;
+            text-align: justify;
+        }
+        .article .content p:first-of-type {
+            font-style: italic;
+        }
+        .article .content p:last-of-type {
+            margin-bottom: 0;
+        }
+        .article .content h2 {
             margin-top: 0;
             margin-bottom: 22px;
-            font-size: 1.25rem;
-            line-height: 1.4rem;
+            font-size: 1.3rem;
+            line-height: 1.45rem;
             color: #333;
             text-align: center;
+        }
+        .article .content img {
+            width: 100%;
+            border: 1px solid #ddd;
         }
         .logo {
             max-width: 200px;
             height: auto;
             background-color: royalblue;
+        }
+        .rider {
+            font-size: 0.8rem;
+            line-height: 1.25rem;
+            font-style: italic;
+            color: #666;
+            text-align: center;
+            margin: 10px 0 50px 0;
+            width: 100%;
         }
         footer {
             background-color: #1e1e1e;
@@ -189,45 +225,105 @@ def produce_html(content: list) -> str:
         <a href="business.html">Business</a>
     </nav>
     <section>
+    <footer>
+        <a href="terms.html">Terms</a>
+        <a href="cookies.html">Cookies</a>
+        <a href="privacy.html">Privacy</a>
+    </footer>
 """
+
+    # Add the actual stories to the page.
+    origin_links = ['boring version', 'snoozefest version', 'grown up version', 'profession version',
+                    'not funny version', "you dad's version", 'safe for work version', 'old fashioned version']
+    for headline, thumbnail, story, origin in content:
+        label = origin_links.pop(0)
+        origin_links.append(label)
+
+        html += f"""
+        <div class="article">
+            <div class="content">
+                <h2>{headline}</h2>
+                <img src="{thumbnail}">
+                <p>{story}</p>
+            </div>
+            <p class="source"><a href="{origin}">{label}</a></p>
+        </div>
+"""
+
+
+    #     html += f"""        <div class="article">
+    #             <h2>{headline}</h2>
+    #             <img src="{thumbnail}">
+    #             <p>{story}</p>
+    #         </div>
+    # """
 
     # Add a timestamp to the page footer.
     now = datetime.now()
     dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
     print("date and time =", dt_string)
-    html += f"""
-    <footer>
-        Last refresh: {dt_string}
-    </footer>
-"""
-    # Add the actual stories to the page.
-    for headline, thumbnail, story in content:
-        html += f"""        <div class="article">
-            <h2>{headline}</h2>
-            <img src="{thumbnail}">
-            <p>{story}</p>
-        </div>
-"""
-    # Close remaining tags.
-    html += """    </section>
-    <script>
 
-const articles = document.querySelectorAll('.article');
+    html += f"""
+    </section>
+    <div class="rider">
+        Last refresh: {dt_string}<br/>This website is an experiment in generative AI and intended for amusement purposes only<br/>Honestly relax! Its just a joke
+    </div>
+    <script>"""
+
+    html += """
+const articles = document.querySelectorAll('.article .content');
 
 articles.forEach(article => {
     const prose = article.querySelector('p');
-    const parts = prose.textContent.match(/[^\.!\?]+[\.!\?]+/g);
+    const parts = (prose.textContent + ' ').split(/([.?!]\s)/).filter(i => i); // adds space to simplify last sentence checking
+
+    for (let i = 0; i < parts.length; i += 2) {
+        const text = parts[i].trim();
+        const punc = parts[i + 1] || '';
+
+        if (text.length) {
+            const alt = document.createElement('p');
+            alt.textContent = text + punc;
+            prose.after(alt);
+        }
+    }
 
     article.removeChild(prose);
-    parts.forEach(part => {
-        const alt = document.createElement('p');
-        alt.textContent = part.trim();
-        article.appendChild(alt);
-    });
 });
+
+
     </script>
 </body>
 </html>"""
+
+
+#     html += f"""
+#     <footer>
+#         Last refresh: {dt_string}
+#     </footer>
+# """
+#
+#
+#     # Close remaining tags.
+#     html += """    </section>
+#     <script>
+#
+# const articles = document.querySelectorAll('.article');
+#
+# articles.forEach(article => {
+#     const prose = article.querySelector('p');
+#     const parts = prose.textContent.match(/[^\.!\?]+[\.!\?]+/g);
+#
+#     article.removeChild(prose);
+#     parts.forEach(part => {
+#         const alt = document.createElement('p');
+#         alt.textContent = part.trim();
+#         article.appendChild(alt);
+#     });
+# });
+#     </script>
+# </body>
+# </html>"""
 
     return html
 
@@ -267,7 +363,7 @@ def obtain_pages_list(filename: str) -> list:
 
 def main():
     load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
-    for each_page in obtain_pages_list('pages.json'):
+    for each_page in obtain_pages_list('pages.json')[:1]:
         stories = obtain_stories(rss_url=each_page['rss_url'])
         print(each_page['page'])
         print(stories)
@@ -276,22 +372,10 @@ def main():
                                    example=each_page['example'],
                                    num_stories=1)  # 1 story only when testing locally, to save GPT API costs.
         html = produce_html(content=content)
-        # print(html)
+        print(html)
 
 
 def lambda_handler(event, context):
-    # load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
-    # for each_page in obtain_pages_list('pages.json'):
-    #     stories = obtain_stories(rss_url=each_page['rss_url'])
-    #
-    #     print(each_page['page'])
-    #     content = generate_content(rss_url=each_page['rss_url'],
-    #                                humour_style=each_page['humour_style'],
-    #                                num_stories=int(os.environ.get('NUM_STORIES')))
-    #
-    #     html = produce_html(content)
-    #     print(html)
-
     load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
     for each_page in obtain_pages_list('pages.json'):
         stories = obtain_stories(rss_url=each_page['rss_url'])
@@ -308,6 +392,23 @@ def lambda_handler(event, context):
                     object_key=each_page['page'],
                     data=html)
     cloudfront_refresh(distribution_id=os.environ.get('DISTRIBUTION_ID'))
+
+    # load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
+    # for each_page in obtain_pages_list('pages.json'):
+    #     stories = obtain_stories(rss_url=each_page['rss_url'])
+    #     print(each_page['page'])
+    #     print(stories)
+    #     content = generate_content(stories=stories,
+    #                                humour_style=each_page['humour_style'],
+    #                                example=each_page['example'],
+    #                                num_stories=int(os.environ.get('NUM_STORIES')))
+    #     html = produce_html(content=content)
+    #     print(html)
+    #
+    #     write_to_s3(bucket=os.environ.get('BUCKET'),
+    #                 object_key=each_page['page'],
+    #                 data=html)
+    # cloudfront_refresh(distribution_id=os.environ.get('DISTRIBUTION_ID'))
 
 
 if __name__ == "__main__":
