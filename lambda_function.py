@@ -1,7 +1,5 @@
 # News Poke AWS Lambda.
 
-# from rss_parser import RSSParser
-# from requests import get  # noqa
 import feedparser
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -59,7 +57,7 @@ I will now give you a real news headline inside the XML tag 'headline' and one s
 {story}
 </story>
 
-Your should respond with a new version of the story, that is in the style of {humour_style}.
+You should respond with a new version of the story, that is in the style of {humour_style}.
 Do not include any XML tags in your response.
 Do not include any newline characters in your response.
 Up to 3 sentences would be the ideal length.
@@ -90,11 +88,16 @@ You should think about whether the story I give you is a serious subject that is
     return content
 
 
-def produce_html(content: list) -> str:
+def produce_html(content: list, analytics_tagging: str) -> str:
     html = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
+"""
+
+    html += analytics_tagging
+
+    html += """   
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto">
@@ -250,14 +253,6 @@ def produce_html(content: list) -> str:
         </div>
 """
 
-
-    #     html += f"""        <div class="article">
-    #             <h2>{headline}</h2>
-    #             <img src="{thumbnail}">
-    #             <p>{story}</p>
-    #         </div>
-    # """
-
     # Add a timestamp to the page footer.
     now = datetime.now()
     dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
@@ -296,35 +291,6 @@ articles.forEach(article => {
 </body>
 </html>"""
 
-
-#     html += f"""
-#     <footer>
-#         Last refresh: {dt_string}
-#     </footer>
-# """
-#
-#
-#     # Close remaining tags.
-#     html += """    </section>
-#     <script>
-#
-# const articles = document.querySelectorAll('.article');
-#
-# articles.forEach(article => {
-#     const prose = article.querySelector('p');
-#     const parts = prose.textContent.match(/[^\.!\?]+[\.!\?]+/g);
-#
-#     article.removeChild(prose);
-#     parts.forEach(part => {
-#         const alt = document.createElement('p');
-#         alt.textContent = part.trim();
-#         article.appendChild(alt);
-#     });
-# });
-#     </script>
-# </body>
-# </html>"""
-
     return html
 
 
@@ -361,6 +327,11 @@ def obtain_pages_list(filename: str) -> list:
         return json.loads(file.read())
 
 
+def obtain_analytics_tagging(filename: str) -> str:
+    with open(filename, 'r') as file:
+        return file.read()
+
+
 def main():
     load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
     for each_page in obtain_pages_list('pages.json')[:1]:
@@ -371,7 +342,7 @@ def main():
                                    humour_style=each_page['humour_style'],
                                    example=each_page['example'],
                                    num_stories=1)  # 1 story only when testing locally, to save GPT API costs.
-        html = produce_html(content=content)
+        html = produce_html(content=content, analytics_tagging=obtain_analytics_tagging('analytics_tagging.txt'))
         print(html)
 
 
@@ -385,30 +356,13 @@ def lambda_handler(event, context):
                                    humour_style=each_page['humour_style'],
                                    example=each_page['example'],
                                    num_stories=int(os.environ.get('NUM_STORIES')))
-        html = produce_html(content=content)
+        html = produce_html(content=content, analytics_tagging=obtain_analytics_tagging('analytics_tagging.txt'))
         print(html)
 
         write_to_s3(bucket=os.environ.get('BUCKET'),
                     object_key=each_page['page'],
                     data=html)
     cloudfront_refresh(distribution_id=os.environ.get('DISTRIBUTION_ID'))
-
-    # load_dotenv(verbose=True)           # Set operating system environment variables based on contents of .env file.
-    # for each_page in obtain_pages_list('pages.json'):
-    #     stories = obtain_stories(rss_url=each_page['rss_url'])
-    #     print(each_page['page'])
-    #     print(stories)
-    #     content = generate_content(stories=stories,
-    #                                humour_style=each_page['humour_style'],
-    #                                example=each_page['example'],
-    #                                num_stories=int(os.environ.get('NUM_STORIES')))
-    #     html = produce_html(content=content)
-    #     print(html)
-    #
-    #     write_to_s3(bucket=os.environ.get('BUCKET'),
-    #                 object_key=each_page['page'],
-    #                 data=html)
-    # cloudfront_refresh(distribution_id=os.environ.get('DISTRIBUTION_ID'))
 
 
 if __name__ == "__main__":
