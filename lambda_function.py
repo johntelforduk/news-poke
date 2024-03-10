@@ -88,7 +88,9 @@ You should think about whether the story I give you is a serious subject that is
     return content
 
 
-def produce_html(content: list, analytics_tagging: str) -> str:
+def produce_html(title: str,
+                 content: list,
+                 analytics_tagging: str) -> str:
     html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -100,130 +102,189 @@ def produce_html(content: list, analytics_tagging: str) -> str:
     html += """   
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto">
     <title>The Daily Burp</title>
     <style>
-        body {
-            font-family: Roboto, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f3f3f3;
-            min-width: 300px;
-        }
-        header {
-            background-color: #f7f7f7;
-            color: #ffffff;
-            padding: 10px 10px; /* Increased vertical padding */
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        nav {
-            background-color: #1e1e1e;
-            color: #ffffff;
-            padding: 10px;
-            text-align: center;
-        }
-        nav a,
-        footer a {
-            color: #ffffff;
-            text-decoration: none;
-            margin: 0 10px;
-        }
-        section {
-            padding: 20px 10px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        .article {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            background-color: #ffffff !important;
-            border: 1px solid #e6e6e6;
-            border-radius: 10px;
-            margin: 10px;
-            padding: 20px;
-            box-shadow: 0px 3px 15px rgba(0,0,0,0.3);
-            max-width: 300px;
-        }
-        .article .content {
-            flex: 1;
-        }
-        .article .source {
-            margin-bottom: 0;
-        }
-        .article .source a,
-        .article .source a:visited,
-        .article .source a:active,
-        .article .source a:hover {
-            text-decoration: none;
-            color: #999;
-            font-size: 0.9rem;
-            padding: 5px 8px;
-            margin-bottom: 0;
-            border: 1px solid #aaa;
-            border-radius: 8px;
-            float: right;
-        }
-        .article .content p {
-            color: #777;
-            font-size: 1rem;
-            line-height: 1.25rem;
-            text-align: justify;
-        }
-        .article .content p:first-of-type {
-            font-style: italic;
-        }
-        .article .content p:last-of-type {
-            margin-bottom: 0;
-        }
-        .article .content h2 {
-            margin-top: 0;
-            margin-bottom: 22px;
-            font-size: 1.3rem;
-            line-height: 1.45rem;
-            color: #333;
-            text-align: center;
-        }
-        .article .content img {
-            width: 100%;
-            border: 1px solid #ddd;
-        }
-        .logo {
-            max-width: 200px;
-            height: auto;
-            background-color: royalblue;
-        }
-        .rider {
-            font-size: 0.8rem;
-            line-height: 1.25rem;
-            font-style: italic;
-            color: #666;
-            text-align: center;
-            margin: 10px 0 50px 0;
-            width: 100%;
-        }
-        footer {
-            background-color: #1e1e1e;
-            color: #ffffff;
-            text-align: center;
-            padding: 10px;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            font-size: 12px;
-        }
+
+body {
+    font-family: Roboto, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f3f3f3;
+    min-width: 300px;
+}
+
+header {
+    background: linear-gradient(to bottom right, darkblue, #4169E1);
+    color: #ffffff;
+    padding: 10px;
+}
+
+.header-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.logo {
+    max-width: 100px;
+    margin: 0 20px;
+    height: auto;
+}
+
+h1 {
+    font-size: 2.7rem;
+    margin: 0;
+    display: inline;
+}
+
+h3 {
+    margin: 0;
+    margin-left: auto;
+    margin-right: 30px;
+    font-size: 1.75rem;
+}
+
+@media (max-width: 768px) {
+    h3 {
+        font-size:0.1rem;
+        visibility: hidden;
+    }
+}
+
+@media (max-width: 550px) {
+    h1 {
+        font-size: 2rem;
+    }
+}
+
+nav {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    padding: 10px;
+    text-align: center;
+}
+
+nav a,
+footer a {
+    color: #ffffff;
+    text-decoration: none;
+    margin: 0 10px;
+}
+
+nav a.active {
+    color: cyan;
+}
+
+section {
+    padding: 20px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 1800px;
+}
+
+.article {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background-color: #ffffff !important;
+    border: 1px solid #e6e6e6;
+    border-radius: 10px;
+    margin: 10px;
+    padding: 20px;
+    box-shadow: 0px 3px 15px rgba(0,0,0,0.3);
+    max-width: 300px;
+}
+
+.article .content {
+    flex: 1;
+}
+
+.article .source {
+    margin-bottom: 0;
+}
+
+.article .source a,
+.article .source a:visited,
+.article .source a:active,
+.article .source a:hover {
+    text-decoration: none;
+    color: #999;
+    font-size: 0.9rem;
+    padding: 5px 8px;
+    margin-bottom: 0;
+    border: 1px solid #aaa;
+    border-radius: 8px;
+    float: right;
+}
+
+.article .content p {
+    color: #777;
+    font-size: 1rem;
+    line-height: 1.25rem;
+    text-align: justify;
+}
+
+.article .content p:first-of-type {
+    font-style: italic;
+}
+
+.article .content p:last-of-type {
+    margin-bottom: 0;
+}
+
+.article .content h2 {
+    margin-top: 0;
+    margin-bottom: 22px;
+    font-size: 1.3rem;
+    line-height: 1.45rem;
+    color: #333;
+    text-align: center;
+}
+
+.article .content img {
+    width: 100%;
+    border: 1px solid #ddd;
+}
+
+.rider {
+    font-size: 0.8rem;
+    line-height: 1.25rem;
+    font-style: italic;
+    color: #666;
+    text-align: center;
+    margin: 10px 0 50px 0;
+    width: 100%;
+}
+
+footer {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    text-align: center;
+    padding: 10px;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    font-size: 12px;
+}
+
     </style>
-</head>
+</head>"""
+
+    html += f"""
 <body>
     <header>
-        <img src="logo.png" alt="Logo" class="logo">
+        <div class="header-container">
+            <img src="website_logo.png" alt="Logo" class="logo">
+            <h1>The Daily Burp</h1>
+            <h3>{title}</h3>
+        </div>
     </header>
     <nav>
-        <a href="index.html">Home</a>
+        <a href="index.html" class="active">Home</a>
         <a href="sport.html">Sport</a>
         <a href="business.html">Business</a>
     </nav>
@@ -232,8 +293,7 @@ def produce_html(content: list, analytics_tagging: str) -> str:
         <a href="terms.html">Terms</a>
         <a href="cookies.html">Cookies</a>
         <a href="privacy.html">Privacy</a>
-    </footer>
-"""
+    </footer>"""
 
     # Add the actual stories to the page.
     origin_links = ['boring version', 'snoozefest version', 'grown up version', 'profession version',
@@ -342,7 +402,9 @@ def main():
                                    humour_style=each_page['humour_style'],
                                    example=each_page['example'],
                                    num_stories=1)  # 1 story only when testing locally, to save GPT API costs.
-        html = produce_html(content=content, analytics_tagging=obtain_analytics_tagging('analytics_tagging.txt'))
+        html = produce_html(title=each_page['title'],
+                            content=content,
+                            analytics_tagging=obtain_analytics_tagging('analytics_tagging.txt'))
         print(html)
 
 
@@ -356,7 +418,9 @@ def lambda_handler(event, context):
                                    humour_style=each_page['humour_style'],
                                    example=each_page['example'],
                                    num_stories=int(os.environ.get('NUM_STORIES')))
-        html = produce_html(content=content, analytics_tagging=obtain_analytics_tagging('analytics_tagging.txt'))
+        html = produce_html(title=each_page['title'],
+                            content=content,
+                            analytics_tagging=obtain_analytics_tagging('analytics_tagging.txt'))
         print(html)
 
         write_to_s3(bucket=os.environ.get('BUCKET'),
