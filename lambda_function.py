@@ -274,6 +274,18 @@ footer {
     </style>
 </head>"""
 
+    if title == 'News Headlines':
+        news_active = ' class="active"'
+    else:
+        news_active = ''
+    if title == 'Sport':
+        sport_active = ' class="active"'
+    else:
+        sport_active = ''
+    if title == 'Business':
+        business_active = ' class="active"'
+    else:
+        business_active = ''
     html += f"""
 <body>
     <header>
@@ -284,9 +296,9 @@ footer {
         </div>
     </header>
     <nav>
-        <a href="index.html" class="active">Home</a>
-        <a href="sport.html">Sport</a>
-        <a href="business.html">Business</a>
+        <a href="index.html"{news_active}>Home</a>
+        <a href="sport.html"{sport_active}>Sport</a>
+        <a href="business.html"{business_active}>Business</a>
     </nav>
     <section>
     <footer>
